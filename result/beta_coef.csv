@@ -1,0 +1,8 @@
+,coef,name,mean,lower,upper
+1,mu.a1,elevation,0.28,-0.11,0.70
+2,mu.a3,population,-1.45,-2.78,-0.41
+3,mu.a5,punishment,10.35,4.93,15.87
+4,mu.a6,outreach,1.94,0.91,3.12
+5,mu.a11,income,0.41,-0.08,0.85
+6,mu.b1,camhour,0.35,0.08,0.73
+7,mu.b2,camangle,0.26,-0.32,0.92
