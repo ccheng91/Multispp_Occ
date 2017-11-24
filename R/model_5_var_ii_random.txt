@@ -1,0 +1,108 @@
+### random effects ###
+model{
+  
+  omega ~ dunif(0,1)
+  u.mean ~ dunif(0,1)	
+  mu.u <- log(u.mean) - log(1-u.mean)
+  
+  v.mean ~ dunif(0,1)
+  mu.v <- log(v.mean) - log(1-v.mean)
+  
+  mu.a1 ~ dnorm(0, 0.01)
+  mu.a3 ~ dnorm(0, 0.01)
+  mu.a5 ~ dnorm(0, 0.01)
+  mu.a6 ~ dnorm(0, 0.01)
+  mu.a11 ~ dnorm(0, 0.01)
+  
+  mu.b1 ~ dnorm(0, 0.01)
+  mu.b2 ~ dnorm(0, 0.01)
+  
+  tau.u ~ dgamma(0.1,0.1)  
+  tau.v ~ dgamma(0.1,0.1)
+  
+  tau.b1 ~ dgamma(0.1,0.1)
+  tau.b2 ~ dgamma(0.1,0.1)
+  
+  tau.a1 ~ dgamma(0.1,0.1)
+  tau.a3 ~ dgamma(0.1,0.1)
+  tau.a5 ~ dgamma(0.1,0.1)
+  tau.a6 ~ dgamma(0.1,0.1)
+  tau.a11 ~ dgamma(0.1,0.1)
+ 
+  tau.p.psi ~ dgamma(0.01,0.01)
+  tau.p.p ~ dgamma(0.01,0.01)
+ 
+ # priors for park
+ 
+ for (p in 1:6) {
+ park.psi[p] ~ dnorm(0, tau.p.psi)
+ park.p[p] ~ dnorm(0, tau.p.p)
+ }
+ 
+  park.psi.sd <- pow(tau.p.psi, -0.5)
+  park.p.sd <- pow(tau.p.p, -0.5) 
+ 
+  # Loop over all species i 
+  
+  
+  for (i in 1:(n+nzeroes)) {
+    
+    # Create priors for species i from the community level prior distributions
+    
+  w[i] ~ dbern(omega)
+  u[i] ~ dnorm(mu.u, tau.u)
+  v[i] ~ dnorm(mu.v, tau.v)   
+    
+  a1[i] ~ dnorm(mu.a1, tau.a1)
+  a3[i] ~ dnorm(mu.a3, tau.a3)
+  a5[i] ~ dnorm(mu.a5, tau.a5)
+  a6[i] ~ dnorm(mu.a6, tau.a6)
+  a11[i] ~ dnorm(mu.a11, tau.a11)
+    
+  b1[i] ~ dnorm(mu.b1, tau.b1)
+  b2[i] ~ dnorm(mu.b2, tau.b2)
+
+# Create a loop to estimate the Z matrix 
+for (j in 1:J) {
+ 
+      logit(psi[j,i]) <- u[i] + park.psi[park.ind[j]] + a1[i]*elev[j]  +a3[i]*pop[j]  + 
+                          a5[i]*punish[j] +a6[i]*reach[j] +a11[i]*income[j] 
+      
+      mu.psi[j,i] <- psi[j,i]*w[i]
+      Z[j,i] ~ dbern(mu.psi[j,i]) #Occupancy Matrix
+
+      # Create a loop to estimate detection for species i 
+     for(k in 1:K[j]){ 
+        logit(p[j,k,i]) <- v[i] + park.p[park.ind[j]] + b1[i]*camhour[j,k] + b2[i]*cam_angle[j,k] 
+        mu.p[j,k,i] <- p[j,k,i]*Z[j,i]
+        X[j,k,i] ~ dbern(mu.p[j,k,i])	
+        Xnew[j,k,i] ~ dbern(mu.p[j,k,i])
+        
+        #Create simulated dataset to calculate the Bayesian p-value
+        d[j,k,i]<-  abs(X[j,k,i] - mu.p[j,k,i]) 
+        dnew[j,k,i]<- abs(Xnew[j,k,i] - mu.p[j,k,i]) 
+        d2[j,k,i]<- pow(d[j,k,i],2)  
+        dnew2[j,k,i]<- pow(dnew[j,k,i],2) 
+    } #K	
+
+      dsum[j,i]<- sum(d2[j,1:K[j],i]) 
+      dnewsum[j,i]<- sum(dnew2[j,1:K[j],i])
+  } # J  
+} # n + nzero
+
+  #Calculate the discrepancy measure, which is then defined as the mean(p.fit > p.fitnew)
+  p.fit<-sum(dsum[,]) 
+  p.fitnew<-sum(dnewsum[,])
+  
+  #Calculate site richness
+  for(j in 1:J){
+    Nsite[j]<- inprod(Z[j,1:(n+nzeroes)],w[1:(n+nzeroes)])
+  } # J
+  
+  
+  # Sum all species observed (n) and unobserved species (n0) to find the total estimated richness
+  n0 <- sum(w[(n+1):(n+nzeroes)])	
+  N <- n + n0
+
+
+}

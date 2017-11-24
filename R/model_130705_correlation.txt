@@ -1,0 +1,125 @@
+model{
+
+omega ~ dunif(0,1)
+
+u.mean ~ dunif(0,1)	
+mu.u <- log(u.mean) - log(1-u.mean)
+
+v.mean ~ dunif(0,1)
+mu.v <- log(v.mean) - log(1-v.mean)
+
+mu.a1 ~ dnorm(0, 0.01)
+mu.a2 ~ dnorm(0, 0.01)
+mu.a3 ~ dnorm(0, 0.01)
+mu.a44 ~ dnorm(0, 0.01)
+mu.a55 ~ dnorm(0, 0.01)
+mu.a6 ~ dnorm(0, 0.01)
+mu.a7 ~ dnorm(0, 0.01)
+
+mu.b1 ~ dnorm(0, 0.01)
+mu.b2 ~ dnorm(0, 0.01)
+
+tau.u ~ dgamma(0.1,0.1)  
+tau.v ~ dgamma(0.1,0.1)
+
+tau.b1 ~ dgamma(0.1,0.1)
+tau.b2 ~ dgamma(0.1,0.1)
+
+tau.a1 ~ dgamma(0.1,0.1)
+tau.a2 ~ dgamma(0.1,0.1)
+tau.a3 ~ dgamma(0.1,0.1)
+tau.a44 ~ dgamma(0.1,0.1)
+tau.a55 ~ dgamma(0.1,0.1)
+tau.a6 ~ dgamma(0.1,0.1)
+tau.a7 ~ dgamma(0.1,0.1)
+
+sigma.a3 <- 1/sqrt(tau.a3)
+sigma.a4 <- 1/sqrt(tau.a4)
+sigma.a5 <- 1/sqrt(tau.a5)
+
+rho1 ~ dunif(-1,1)
+tau.a4 <- tau.a44 /(1.-pow(rho1,2))
+
+rho2 ~ dunif(-1,1)
+tau.a5 <- tau.a55 /(1.-pow(rho2,2))
+
+
+# Loop over all species i 
+for (i in 1:(n+nzeroes)) {
+
+# Create priors for species i from the community level prior distributions
+	
+	w[i] ~ dbern(omega)
+	u[i] ~ dnorm(mu.u, tau.u)
+	v[i] ~ dnorm(mu.v, tau.v)   
+
+        a1[i] ~ dnorm(mu.a1, tau.a1)
+        a2[i] ~ dnorm(mu.a2, tau.a2)
+        a3[i] ~ dnorm(mu.a3, tau.a3)
+
+   mu.a4[i] <- mu.a44 + (rho1*sigma.a4/sigma.a3)*(a3[i] - mu.a3)
+   a4[i] ~ dnorm(mu.a4[i], tau.a4) 
+
+   mu.a5[i] <- mu.a55 + (rho2*sigma.a5/sigma.a3)*(a3[i] - mu.a3)
+   a5[i] ~ dnorm(mu.a5[i], tau.a5) 
+
+	a6[i] ~ dnorm(mu.a6, tau.a6)
+	a7[i] ~ dnorm(mu.a7, tau.a7)
+
+        b1[i] ~ dnorm(mu.b1, tau.b1)
+        b2[i] ~ dnorm(mu.b2, tau.b2)
+
+        sigma.a8[i] ~ dunif(0,10)
+        tau.a8[i] <- 1/(sigma.a8[i]*sigma.a8[i])
+
+        for (f in 1:nsite) {a8[i,f] ~ dnorm(0, tau.a8[i])}
+
+
+# Create a loop to estimate the Z matrix 
+   
+   for (j in 1:J) {
+       
+     logit(psi[j,i]) <- u[i] +a1[i]*elev[j] +a2[i]*elev[j]*elev[j] +a3[i]*hunt[j] +a4[i]*newlog[j] +a5[i]*oldlog[j] +a8[i,site[j]]
+     mu.psi[j,i] <- psi[j,i]*w[i]
+     Z[j,i] ~ dbern(mu.psi[j,i])
+
+# Create a loop to estimate detection for species i 
+ 
+     for (k in 1:K[j]) {  	
+    	logit(p[j,k,i]) <-  v[i] + b1[i]*day[j,k] + b2[i]*hours[j,k] 
+     mu.p[j,k,i] <- p[j,k,i]*Z[j,i]
+       X[j,k,i] ~ dbern(mu.p[j,k,i])	
+       Xnew[j,k,i] ~ dbern(mu.p[j,k,i])
+
+   #Create simulated dataset to calculate the Bayesian p-value
+     d[j,k,i]<-  abs(X[j,k,i] - mu.p[j,k,i]) 
+     dnew[j,k,i]<- abs(Xnew[j,k,i] - mu.p[j,k,i]) 
+     d2[j,k,i]<- pow(d[j,k,i],2)  
+     dnew2[j,k,i]<- pow(dnew[j,k,i],2) 
+    	}
+     
+     dsum[j,i]<- sum(d2[j,1:K[j],i]) 
+     dnewsum[j,i]<- sum(dnew2[j,1:K[j],i])
+	
+  }		
+    }
+
+   #Calculate the discrepancy measure, which is then defined as the mean(p.fit > p.fitnew)
+      p.fit<-sum(dsum[,]) 
+      p.fitnew<-sum(dnewsum[,])
+
+#Calculate site richness
+for(j in 1:J){
+Nsite[j]<- inprod(Z[j,1:(n+nzeroes)],w[1:(n+nzeroes)])
+}
+
+
+# Sum all species observed (n) and unobserved species (n0) to find the total estimated richness
+n0 <- sum(w[(n+1):(n+nzeroes)])	
+N <- n + n0
+
+
+} 
+
+
+
