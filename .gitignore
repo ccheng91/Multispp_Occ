@@ -1,5 +1,7 @@
-.Rproj.user
-.Rhistory
+*.Rproj.user
+*.Rhistory
 *.RData
-.Ruserdata
-pdf/
+*.Ruserdata
+
+# file 
+Workplace/
